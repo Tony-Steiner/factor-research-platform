@@ -1,0 +1,22 @@
+# Secrets
+.env
+
+# Python artifacts
+__pycache__/
+*.pyc
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+
+# Virtual environment
+factor-research/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Draft notebooks (keep only polished research_report.ipynb)
+notebooks/drafts/
