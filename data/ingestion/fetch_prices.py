@@ -5,12 +5,7 @@ from io import StringIO
 from dotenv import load_dotenv
 import os
 from sqlalchemy import create_engine, text
-
-load_dotenv()
-
-connection_url = f"postgresql+psycopg2://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
-
-engine = create_engine(connection_url)
+from config.settings import engine
 
 try:
     with engine.connect() as connection:

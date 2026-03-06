@@ -5,12 +5,7 @@ import requests
 from io import StringIO
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
-
-load_dotenv()
-
-connection_url = f"postgresql+psycopg2://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
-
-engine = create_engine(connection_url)
+from config.settings import engine, fetch_financial_statements
 
 try:
     with engine.connect() as connection:
@@ -33,78 +28,18 @@ tickers = (
     sp500["Symbol"].str.replace(".", "-", regex=False).tolist()
 )  # Convert to list and replace '.' with '-' for yfinance compatibility
 
+
 # 2. Fetch quarterly income statements and balance sheets for each ticker
-ok_stmt = []
-failed_stmt = {}
-
-ok_sheet = []
-failed_sheet = {}
-
-for t in tickers:
-    ticker_obj = yf.Ticker(t)
-    try:
-        stmt_df = ticker_obj.quarterly_income_stmt
-        if stmt_df.empty:
-            failed_stmt[t] = "empty"
-            continue
-
-        required = {"Total Revenue", "Net Income"}
-        if not required.issubset(stmt_df.index):
-
-            failed_stmt[t] = f"missing rows: {required - set(stmt_df.index)}"
-            continue
-
-        df_stmt = stmt_df.loc[list(required)].T
-
-        df_stmt = df_stmt.dropna(subset=["Total Revenue", "Net Income"])
-
-        df_stmt = (
-            df_stmt.reset_index()
-        )  # Move the index (quarter-end dates) into a column
-        df_stmt = df_stmt.rename(
-            columns={"index": "report_date"}
-        )  # Rename the new column to 'date'
-
-        # standardize column names (lowercase, underscores)
-        df_stmt.columns = [col.lower().replace(" ", "_") for col in df_stmt.columns]
-
-        # Add ticker column
-        df_stmt["ticker"] = t
-        ok_stmt.append(df_stmt)
-
-    except Exception as e:
-        failed_stmt[t] = str(e)
-
-    try:
-        sheet_df = ticker_obj.quarterly_balance_sheet
-        if sheet_df.empty:
-            failed_sheet[t] = "empty"
-            continue
-
-        required = {"Stockholders Equity", "Total Debt", "Ordinary Shares Number"}
-        if not required.issubset(sheet_df.index):
-
-            failed_sheet[t] = f"missing rows: {required - set(sheet_df.index)}"
-            continue
-
-        df_sheet = sheet_df.loc[list(required)].T
-
-        df_sheet = df_sheet.dropna(
-            subset=["Stockholders Equity", "Total Debt", "Ordinary Shares Number"]
-        )
-
-        df_sheet = df_sheet.reset_index()
-        df_sheet = df_sheet.rename(columns={"index": "report_date"})
-
-        df_sheet.columns = [col.lower().replace(" ", "_") for col in df_sheet.columns]
-
-        df_sheet["ticker"] = t
-        ok_sheet.append(df_sheet)
-
-    except Exception as e:
-        failed_sheet[t] = str(e)
-
+required_stmt = {"Total Revenue", "Net Income"}
+ok_stmt, failed_stmt = fetch_financial_statements(
+    tickers, required_stmt, "quarterly_income_stmt"
+)
 data_stmt = pd.concat(ok_stmt) if ok_stmt else pd.DataFrame()
+
+required_sheet = {"Stockholders Equity", "Total Debt", "Ordinary Shares Number"}
+ok_sheet, failed_sheet = fetch_financial_statements(
+    tickers, required_sheet, "quarterly_balance_sheet"
+)
 data_sheet = pd.concat(ok_sheet) if ok_sheet else pd.DataFrame()
 
 # 3. Merge the two datasets on ticker and report_date
