@@ -83,3 +83,16 @@ select f.ticker,
 from fundamentals f
 order by f.ticker,
    f.report_date;
+-- Compound Fama-French daily factor returns into monthly returns.
+-- Uses EXP(SUM(LN(1+r))) - 1 as the SQL equivalent of (1+r).prod() - 1
+-- since PostgreSQL has no native PROD() aggregate.
+CREATE OR REPLACE VIEW ff_monthly_factors AS
+SELECT DATE_TRUNC('month', date)::date AS month_start,
+   EXP(SUM(LN(1 + mkt_rf / 100))) - 1 AS mkt_rf,
+   EXP(SUM(LN(1 + smb / 100))) - 1 AS smb,
+   EXP(SUM(LN(1 + hml / 100))) - 1 AS hml,
+   EXP(SUM(LN(1 + rf / 100))) - 1 AS rf,
+   EXP(SUM(LN(1 + umd / 100))) - 1 AS umd
+FROM ff_factors
+GROUP BY month_start
+ORDER BY month_start;

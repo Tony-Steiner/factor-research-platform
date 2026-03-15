@@ -19,6 +19,7 @@ class Volatility(Factor):
         df["rn"] = df.groupby(["ticker", "month"])["date"].rank(
             method="first", ascending=False
         )
-        monthly = df[df["rn"] == 1]
+        monthly = df[df["rn"] == 1].copy()
+        monthly["date"] = monthly["date"].dt.to_period("M").dt.to_timestamp()
 
         return monthly[["date", "ticker", "raw_score"]]

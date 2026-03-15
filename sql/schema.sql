@@ -31,7 +31,7 @@ create table factor_scores (
       factor_name
    )
 );
-create table backtest_results (
+create table backtest_returns (
    date date not null,
    factor_name varchar(30) not null,
    long_return numeric(10, 6),
