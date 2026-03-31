@@ -17,7 +17,7 @@ WITH quintiles AS (
         fs.quintile
     ORDER BY fs.factor_name,
         fs.quintile,
-        fs.date;
+        fs.date
 )
 SELECT q.date,
     q.factor_name,

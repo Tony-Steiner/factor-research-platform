@@ -1,10 +1,12 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
+import statsmodels.api as sm
 import os
 from config.settings import engine
 from config.settings import PROJECT_ROOT
-from scipy.stats import spearmanr
+from scipy.stats import spearmanr, false_discovery_control
 
 sql_path = os.path.join(PROJECT_ROOT, "sql", "queries", "backtest_returns.sql")
 
@@ -81,6 +83,7 @@ def plot_ic_series(df_ic):
     plt.grid()
     plt.show()
 
+
 def compute_quintile_spreads(engine):
     query = """
         SELECT df.date, fs.factor_name, fs.quintile, AVG(fr.next_month_return) AS avg_return
@@ -91,15 +94,60 @@ def compute_quintile_spreads(engine):
         ORDER BY fs.factor_name, fs,quintile, fs.date;
     """
     df_raw = pd.read_sql(query, engine)
-    df = df_raw.groupby(['factor_name' , 'quintile'])['avg_return'].mean().unstack()
+    df = df_raw.groupby(["factor_name", "quintile"])["avg_return"].mean().unstack()
     return df
+
 
 def plot_quintile_spreads(df_quintiles):
     plt.figure(figsize=(12, 6))
-    sns.barplot(data = df_quintiles.reset_index().melt(id_vars = 'factor_name', var_name = 'quintile', value_name = 'avg_return'), x = 'quintile', hue = 'factor_name', y = 'avg_return')
+    sns.barplot(
+        data=df_quintiles.reset_index().melt(
+            id_vars="factor_name", var_name="quintile", value_name="avg_return"
+        ),
+        x="quintile",
+        hue="factor_name",
+        y="avg_return",
+    )
     plt.title("Average Return by Quintile")
     plt.xlabel("Quintile")
     plt.ylabel("Average Return")
     plt.legend(title="Factor")
     plt.grid()
     plt.show()
+
+
+def compute_significance(engine):
+    backtest_query = open(sql_path).read()
+    df_backtest = pd.read_sql(backtest_query, engine)
+
+    results = []
+    for factor, group in df_backtest.groupby("factor_name"):
+        returns = group["long_short"].dropna()
+
+        if len(returns) < 12:
+            continue
+
+        X = sm.add_constant(np.ones(len(returns)))
+
+        model = sm.OLS(returns.values, X).fit(cov_type="HAC", cov_kwds={"maxlags": 6})
+
+        results.append(
+            {
+                "factor_name": factor,
+                "mean_return": returns.mean(),
+                "nw_tstat": model.tvalues[0],
+                "nw_pvalue": model.pvalues[0],
+                "n_months": len(returns),
+                "significant": model.pvalues[0] < 0.05,
+            }
+        )
+
+    p_values = [r["nw_pvalue"] for r in results]
+    bonferroni = [min(p * 5, 1.0) for p in p_values]
+    bh_adjusted = false_discovery_control(p_values, method="bh")
+
+    df = pd.DataFrame(results)
+    df["bonferroni_p"] = bonferroni
+    df["bh_p"] = bh_adjusted
+
+    return df
