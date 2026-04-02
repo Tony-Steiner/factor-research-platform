@@ -86,12 +86,12 @@ def plot_ic_series(df_ic):
 
 def compute_quintile_spreads(engine):
     query = """
-        SELECT df.date, fs.factor_name, fs.quintile, AVG(fr.next_month_return) AS avg_return
+        SELECT fs.date, fs.factor_name, fs.quintile, AVG(fr.next_month_return) AS avg_return
         FROM factor_scores AS fs
         INNER JOIN forward_returns AS fr ON fs.ticker = fr.ticker
         AND fs.date = fr.month_start
         GROUP BY fs.date, fs.factor_name, fs.quintile
-        ORDER BY fs.factor_name, fs,quintile, fs.date;
+        ORDER BY fs.factor_name, fs.quintile, fs.date;
     """
     df_raw = pd.read_sql(query, engine)
     df = df_raw.groupby(["factor_name", "quintile"])["avg_return"].mean().unstack()
