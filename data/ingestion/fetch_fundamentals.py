@@ -45,8 +45,11 @@ data_sheet = pd.concat(ok_sheet) if ok_sheet else pd.DataFrame()
 # 3. Merge the two datasets on ticker and report_date
 data = pd.merge(data_stmt, data_sheet, on=["ticker", "report_date"], how="inner")
 
-# 4. Write the merged dataset to the PostgreSQL database
-with engine.begin() as conn:
-    conn.execute(text("TRUNCATE TABLE fundamentals;"))
+# 4. Write the merged dataset to the PostgreSQL database OR update existing records
+existing = pd.read_sql('SELECT DISTINCT ticker, report_date FROM fundamentals', engine)
 
-data.to_sql("fundamentals", engine, if_exists="append", index=False)
+new_data = data.merge(existing, on = ['ticker', 'report_date'], how = 'left', indicator = True)
+new_records = new_data[new_data['_merge'] == 'left_only'].drop(columns='_merge')
+
+new_records.to_sql('fundamentals', engine, if_exists = 'append', index = False)
+print(f'Added {len(new_records)} new rows, skipped {len(data) - len(new_records)} existing rows')

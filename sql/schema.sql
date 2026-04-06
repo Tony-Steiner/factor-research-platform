@@ -31,15 +31,6 @@ create table factor_scores (
       factor_name
    )
 );
-create table backtest_returns (
-   date date not null,
-   factor_name varchar(30) not null,
-   long_return numeric(10, 6),
-   short_return numeric(10, 6),
-   long_short numeric(10, 6),
-   benchmark numeric(10, 6),
-   primary key (date, factor_name)
-);
 create table ff_factors (
    date date not null,
    mkt_rf numeric(10, 6),
