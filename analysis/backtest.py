@@ -4,15 +4,19 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 
-from config.settings import engine
+from config.settings import get_engine
 from config.settings import PROJECT_ROOT
 
 sql_path = os.path.join(PROJECT_ROOT, "sql", "queries", "backtest_returns.sql")
 
+with open(sql_path) as f:
+    BACKTEST_QUERY = f.read()
 
-def compute_performance_metrics(engine):
-    backtest_query = open(sql_path).read()
-    df = pd.read_sql(backtest_query, engine)
+
+def compute_performance_metrics():
+    
+
+    df = pd.read_sql(BACKTEST_QUERY, get_engine())
 
     results = []
     for factor, group in df.groupby("factor_name"):
@@ -22,7 +26,7 @@ def compute_performance_metrics(engine):
         # Annualized Sharpe: mean monthly return / std, scaled to annual
         sharpe = (r.mean() / r.std()) * np.sqrt(12) if r.std() > 0 else np.nan
 
-        # Max drawdown: largest peak-to-through decline
+        # Max drawdown: largest peak-to-trough decline
         peak = cumulative.cummax()
         drawdown = (cumulative - peak) / peak
         max_dd = drawdown.min()
@@ -41,9 +45,9 @@ def compute_performance_metrics(engine):
     return pd.DataFrame(results)
 
 
-def compute_turnover(engine):
+def compute_turnover():
     df = pd.read_sql(
-        "SELECT ticker, date, factor_name, quintile FROM factor_scores", engine
+        "SELECT ticker, date, factor_name, quintile FROM factor_scores", get_engine()
     )
 
     results = []
@@ -52,22 +56,14 @@ def compute_turnover(engine):
         turnovers = []
 
         for i in range(1, len(dates)):
-            prev = set(
-                group[
-                    (group["date"] == dates[i - 1]) & (group["quintile"].isin([1, 5]))
-                ]["ticker"]
-            )
-            curr = set(
-                group[(group["date"] == dates[i]) & (group["quintile"].isin([1, 5]))][
-                    "ticker"
-                ]
-            )
+            prev = set(group[(group['date'] == dates[i-1]) & (group['quintile'].isin([1,5]))]['ticker'])
+            curr = set(group[(group['date'] == dates[i]) & (group['quintile'].isin([1,5]))]['ticker'])
 
-            if len(prev) == 0:
+            if len(curr) == 0:
                 continue
 
-            # turnover = fraction of holdings that changed
-            turnover = len(curr.symmetric_difference(prev)) / (len(prev) + len(curr))
+            new_entries = curr - prev # tickers in curr but not in prev
+            turnover = len(new_entries) / len(curr)
             turnovers.append(turnover)
 
         results.append(
@@ -80,9 +76,8 @@ def compute_turnover(engine):
     return pd.DataFrame(results)
 
 
-def compute_cumulative_returns(engine):
-    backtest_query = open(sql_path).read()
-    df_backtest = pd.read_sql(backtest_query, engine)
+def compute_cumulative_returns():
+    df_backtest = pd.read_sql(BACKTEST_QUERY, get_engine())
 
     returns = df_backtest.sort_values(["factor_name", "date"]).copy()
 
@@ -100,4 +95,4 @@ def plot_cumulative_returns(returns):
     plt.xlabel("Date")
     plt.ylabel("Cumulative Return")
     plt.grid()
-    plt.show()
+    return plt.gcf()
