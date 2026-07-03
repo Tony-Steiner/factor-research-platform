@@ -1,53 +1,41 @@
 import pandas as pd
-import urllib.request
-import zipfile
-import io
-from dotenv import load_dotenv
-import os
-from sqlalchemy import create_engine, text
-from config.settings import engine
+import requests
+from config.settings import get_engine, extract_csv_from_zip
+from sqlalchemy import text
 
 try:
-    with engine.connect() as connection:
-        print("Successfully connected to the PostgreSQL database.")
+    with get_engine().connect() as connection:
+        print("Successfully connected")
 except Exception as e:
     print(f"Connection failed: {e}")
 
-# 1. The direct URL to the daily 5-factor CSV zip file
 url1 = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_5_Factors_2x3_daily_CSV.zip"
 url2 = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Momentum_Factor_daily_CSV.zip"
 
-# 2. Download the zip file into memory
-request1 = urllib.request.urlopen(url1)
-request2 = urllib.request.urlopen(url2)
+response1 = requests.get(url1)
+response1.raise_for_status()
+response2 = requests.get(url2)
+response2.raise_for_status()
 
-# 3. Extract and read the CSV
-with zipfile.ZipFile(io.BytesIO(request1.read())) as z:
-    with z.open(z.namelist()[0]) as f:
-        # Fama-French CSVs have 3 lines of text at the top we must skip
-        df1 = pd.read_csv(f, skiprows=3)
+df_ff5 = extract_csv_from_zip(response1, 3)
 
-df1 = df1.rename(columns={"Unnamed: 0": "date"})
-df1 = df1.drop(df1.index[-1])
-df1 = df1.drop(columns=["CMA", "RMW"])
-df1["date"] = pd.to_datetime(df1["date"], format="%Y%m%d")
-df1.columns = [col.lower().replace(" ", "_").replace("-", "_") for col in df1.columns]
+df_ff5 = df_ff5.drop(columns = ['CMA', 'RMW'])
+df_ff5 = df_ff5.rename(columns = {'Unnamed: 0' : 'date'})
+df_ff5 = df_ff5.drop(df_ff5.index[-1])
+df_ff5['date'] = pd.to_datetime(df_ff5['date'], format = '%Y%m%d')
+df_ff5.columns = [col.lower().replace(' ', '_').replace('-', '_') for col in df_ff5.columns]
 
-with zipfile.ZipFile(io.BytesIO(request2.read())) as z:
-    with z.open(z.namelist()[0]) as f:
-        # Fama-French CSVs have 3 lines of text at the top we must skip
-        df2 = pd.read_csv(f, skiprows=13)
+# Fama-French momentum file has 13 lines of header text before the data
+df_mom = extract_csv_from_zip(response2, 13)
 
-df2 = df2.rename(columns={"Unnamed: 0": "date", "Mom": "umd"})
-df2 = df2.drop(df2.index[-1])
-df2["date"] = pd.to_datetime(df2["date"], format="%Y%m%d")
-df2.columns = [col.lower().replace(" ", "_") for col in df2.columns]
+df_mom = df_mom.drop(df_mom.index[-1])
+df_mom = df_mom.rename(columns = {'Unnamed: 0' : 'date', 'Mom' : 'umd'})
+df_mom['date'] = pd.to_datetime(df_mom['date'], format = '%Y%m%d')
+df_mom.columns = [col.lower().replace(' ', '_') for col in df_mom.columns]
 
-# 4. Merge the two datasets on date
-factors = pd.merge(df1, df2, on="date", how="inner")
+factors = pd.merge(df_ff5, df_mom, on = 'date', how = 'inner')
 
-# 5. Write the merged dataset to the PostgreSQL database
-with engine.begin() as conn:
-    conn.execute(text("TRUNCATE TABLE ff_factors"))
+with get_engine().begin() as conn:
+    conn.execute(text('TRUNCATE TABLE ff_factors'))
 
-factors.to_sql("ff_factors", engine, if_exists="append", index=False)
+factors.to_sql('ff_factors', get_engine(), if_exists = 'append', index = False)
