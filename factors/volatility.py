@@ -1,12 +1,12 @@
 import pandas as pd
-from config.settings import engine
 from factors.base import Factor
 
 
 class Volatility(Factor):
     def compute(self):
-        df = pd.read_sql("SELECT * FROM daily_prices", self.engine)
+        df = pd.read_sql("SELECT * FROM daily_prices WHERE ticker IN (SELECT ticker FROM universe)", self.engine)
         df["date"] = pd.to_datetime(df["date"])
+        df = df.sort_values(['ticker', 'date']).reset_index(drop=True)
         df["returns"] = df.groupby("ticker")["close"].pct_change()
         df["volatility"] = (
             df.groupby("ticker")["returns"]

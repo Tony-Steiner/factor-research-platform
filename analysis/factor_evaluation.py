@@ -4,18 +4,19 @@ import seaborn as sns
 import numpy as np
 import statsmodels.api as sm
 import os
-from config.settings import engine
+from config.settings import get_engine
 from config.settings import PROJECT_ROOT
 from scipy.stats import spearmanr, false_discovery_control
 
 sql_path = os.path.join(PROJECT_ROOT, "sql", "queries", "backtest_returns.sql")
 
+with open(sql_path) as f:
+    BACKTEST_QUERY = f.read()
 
-def cross_validation(engine):
-    backtest_query = open(sql_path).read()
-    df_backtest = pd.read_sql(backtest_query, engine)
+def cross_validation():
+    df_backtest = pd.read_sql(BACKTEST_QUERY, get_engine())
 
-    df_ff = pd.read_sql("SELECT * FROM ff_monthly_factors", engine)
+    df_ff = pd.read_sql("SELECT * FROM ff_monthly_factors", get_engine())
 
     mom_ls = df_backtest[df_backtest["factor_name"] == "momentum"][
         ["date", "long_short"]
@@ -54,10 +55,10 @@ def cross_validation(engine):
     return results
 
 
-def compute_ic_series(engine):
-    df_fs = pd.read_sql("SELECT * FROM factor_scores", engine)
+def compute_ic_series():
+    df_fs = pd.read_sql("SELECT * FROM factor_scores", get_engine())
 
-    df_fr = pd.read_sql("SELECT * FROM forward_returns", engine)
+    df_fr = pd.read_sql("SELECT * FROM forward_returns", get_engine())
     df_fr = df_fr.rename(columns={"month_start": "date"})
 
     df = pd.merge(df_fs, df_fr, on=["date", "ticker"])
@@ -84,7 +85,7 @@ def plot_ic_series(df_ic):
     plt.show()
 
 
-def compute_quintile_spreads(engine):
+def compute_quintile_spreads():
     query = """
         SELECT fs.date, fs.factor_name, fs.quintile, AVG(fr.next_month_return) AS avg_return
         FROM factor_scores AS fs
@@ -93,7 +94,7 @@ def compute_quintile_spreads(engine):
         GROUP BY fs.date, fs.factor_name, fs.quintile
         ORDER BY fs.factor_name, fs.quintile, fs.date;
     """
-    df_raw = pd.read_sql(query, engine)
+    df_raw = pd.read_sql(query, get_engine())
     df = df_raw.groupby(["factor_name", "quintile"])["avg_return"].mean().unstack()
     return df
 
@@ -116,9 +117,8 @@ def plot_quintile_spreads(df_quintiles):
     plt.show()
 
 
-def compute_significance(engine):
-    backtest_query = open(sql_path).read()
-    df_backtest = pd.read_sql(backtest_query, engine)
+def compute_significance():
+    df_backtest = pd.read_sql(BACKTEST_QUERY, get_engine())
 
     results = []
     for factor, group in df_backtest.groupby("factor_name"):

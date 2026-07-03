@@ -39,3 +39,7 @@ create table ff_factors (
    rf numeric(10, 6),
    umd numeric(10, 6)
 );
+
+SELECT ticker, ordinary_shares_number 
+FROM derived_fundamentals
+WHERE ticker = 'BRK-B';

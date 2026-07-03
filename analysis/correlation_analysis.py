@@ -2,15 +2,17 @@ import pandas as pd
 import seaborn as sns
 import os
 import matplotlib.pyplot as plt
-from config.settings import engine
+from config.settings import get_engine
 from config.settings import PROJECT_ROOT
 
 sql_path = os.path.join(PROJECT_ROOT, "sql", "queries", "backtest_returns.sql")
 
 
-def compute_factor_correlations(engine):
-    backtest_query = open(sql_path).read()
-    df_backtest = pd.read_sql(backtest_query, engine)
+def compute_factor_correlations():
+    with open(sql_path) as f:
+        backtest_query = f.read()
+        
+    df_backtest = pd.read_sql(backtest_query, get_engine())
 
     pivoted = df_backtest.pivot(
         index="date", columns="factor_name", values="long_short"

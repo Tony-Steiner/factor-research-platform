@@ -1,12 +1,11 @@
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from factors.base import Factor
-from config.settings import engine
 
 
 class Momentum(Factor):
     def compute(self):
-        data = pd.read_sql(text("SELECT * FROM monthly_returns"), self.engine)
+        data = pd.read_sql(text("SELECT * FROM monthly_returns WHERE ticker IN (SELECT ticker FROM universe)"), self.engine)
         data["raw_score"] = (
             data.groupby("ticker")["monthly_return"]
             .apply(

@@ -1,5 +1,4 @@
 import pandas as pd
-from config.settings import engine
 from factors.base import Factor
 
 
@@ -9,7 +8,7 @@ class Quality(Factor):
         df_fund = df_fund.rename(columns={"report_date": "date"})
         df_fund["date"] = pd.to_datetime(df_fund["date"])
 
-        df_monthly = pd.read_sql("SELECT * FROM monthly_returns", self.engine)
+        df_monthly = pd.read_sql("SELECT * FROM monthly_returns WHERE ticker IN (SELECT ticker FROM universe)", self.engine)
         df_monthly = df_monthly.rename(columns={"month_start": "date"})
         df_monthly["date"] = pd.to_datetime(df_monthly["date"])
 

@@ -96,3 +96,12 @@ SELECT DATE_TRUNC('month', date)::date AS month_start,
 FROM ff_factors
 GROUP BY month_start
 ORDER BY month_start;
+
+create or replace view universe as
+select ticker
+from daily_prices
+group by ticker
+having count(*) >= 750
+intersect
+select distinct ticker
+from fundamentals;
